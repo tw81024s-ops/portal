@@ -184,7 +184,6 @@ input[type=file]{display:none}
     <button class="btn ghost" id="editToggle">✎ 編輯模式</button>
     <button class="btn" id="exportBtn">↓ 匯出</button>
     <button class="btn" id="importBtn">↑ 匯入</button>
-    <button class="btn" id="logoutBtn" style="display:none">⎋ 清除密碼</button>
     <input type="file" id="importFile" accept="application/json">
   </div>
 
@@ -302,7 +301,6 @@ const PALETTES = [
    後端設定 — 部署前改成你的 Apps Script 網址
    ============================================================ */
 const API_URL = "https://script.google.com/macros/s/AKfycbydmd4RNIwjwV-USa2S-1E_NSCHlVDjJFeCfpjCbXmDUAe_9qIHy7mO2d9Ra40G73TLHQ/exec";   // ★ 你的 Apps Script /exec 網址
-const PW_KEY    = "portal_edit_pw";     // 編輯密碼只存在編輯者自己的瀏覽器
 const CACHE_KEY = "portal_cache";
 
 let state = [];
@@ -315,8 +313,6 @@ let pendingImg = "";
 const $ = id => document.getElementById(id);
 const grid=$("grid"), filters=$("filters"), overlay=$("overlay");
 
-function getPw(){ try{return localStorage.getItem(PW_KEY)||"";}catch(e){return "";} }
-function setPw(p){ try{ p?localStorage.setItem(PW_KEY,p):localStorage.removeItem(PW_KEY);}catch(e){} }
 function cacheState(){ try{ localStorage.setItem(CACHE_KEY,JSON.stringify(state)); }catch(e){} }
 function status(msg,kind){ const el=$("status"); if(el){ el.textContent=msg||""; el.dataset.kind=kind||""; } }
 
@@ -334,21 +330,18 @@ async function loadData(){
 
 /* 寫回：POST 給 Apps Script（用 text/plain 避開跨網域預檢） */
 async function commit(){
-  const pw=getPw();
-  if(!pw){ status("沒有密碼，無法儲存","warn"); return false; }
   status("儲存中…");
   try{
     const r=await fetch(API_URL,{
       method:"POST",
       headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body:JSON.stringify({password:pw, projects:state})
+      body:JSON.stringify({projects:state})
     });
     const res=await r.json();
     if(!res.ok) throw new Error(res.error||"儲存失敗");
     cacheState(); status("已儲存 ✓ 其他人重新整理即可看到","ok"); return true;
   }catch(e){
     status("儲存失敗："+e.message,"warn");
-    if(String(e.message).includes("密碼")) setPw("");   // 密碼錯就清掉，下次重輸
     return false;
   }
 }
@@ -417,23 +410,9 @@ function applyFont(v){
 $("fontsw").addEventListener("click",e=>{const b=e.target.closest("button");if(b)applyFont(b.dataset.fs||"");});
 try{ applyFont(localStorage.getItem(FS_KEY)||""); }catch(e){}
 $("editToggle").addEventListener("click",()=>{
-  if(!editing && !getPw()){
-    const p=prompt("輸入編輯密碼（只會存在這台裝置）：");
-    if(!p) return;
-    setPw(p.trim());
-  }
   editing=!editing;document.body.classList.toggle("editing",editing);
   $("editToggle").classList.toggle("active",editing);
   $("editToggle").textContent = editing?"✓ 完成編輯":"✎ 編輯模式";
-  $("logoutBtn").style.display = editing?"inline-flex":"none";
-});
-$("logoutBtn").addEventListener("click",()=>{
-  setPw(""); editing=false;
-  document.body.classList.remove("editing");
-  $("editToggle").classList.remove("active");
-  $("editToggle").textContent="✎ 編輯模式";
-  $("logoutBtn").style.display="none";
-  status("已清除密碼","ok");
 });
 
 /* modal */
